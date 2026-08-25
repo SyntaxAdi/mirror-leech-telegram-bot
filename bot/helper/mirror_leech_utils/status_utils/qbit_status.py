@@ -10,6 +10,8 @@ from ...ext_utils.status_utils import (
 
 
 async def get_download(tag, old_info=None):
+    if TorrentManager.qbittorrent is None:
+        return old_info
     try:
         res = (await TorrentManager.qbittorrent.torrents.info(tag=tag))[0]
         return res or old_info
@@ -96,22 +98,28 @@ class QbittorrentStatus:
     async def cancel_task(self):
         self.listener.is_cancelled = True
         await self.update()
-        await TorrentManager.qbittorrent.torrents.stop([self._info.hash])
+        if TorrentManager.qbittorrent is not None and self._info:
+            try:
+                await TorrentManager.qbittorrent.torrents.stop([self._info.hash])
+            except Exception as e:
+                LOGGER.error(e)
         if not self.seeding:
             if self.queued:
                 LOGGER.info(f"Cancelling QueueDL: {self.name()}")
                 msg = "task have been removed from queue/download"
             else:
-                LOGGER.info(f"Cancelling Download: {self._info.name}")
+                LOGGER.info(f"Cancelling Download: {self._info.name if self._info else self.listener.name}")
                 msg = "Stopped by user!"
             await sleep(0.3)
-            await gather(
-                self.listener.on_download_error(msg),
-                TorrentManager.qbittorrent.torrents.delete([self._info.hash], True),
-                TorrentManager.qbittorrent.torrents.delete_tags(
-                    tags=[self._info.tags[0]]
-                ),
-            )
+            tasks = [self.listener.on_download_error(msg)]
+            if TorrentManager.qbittorrent is not None and self._info:
+                tasks.extend([
+                    TorrentManager.qbittorrent.torrents.delete([self._info.hash], True),
+                    TorrentManager.qbittorrent.torrents.delete_tags(
+                        tags=[self._info.tags[0]]
+                    ),
+                ])
+            await gather(*tasks)
             async with qb_listener_lock:
-                if self._info.tags[0] in qb_torrents:
+                if self._info and self._info.tags[0] in qb_torrents:
                     del qb_torrents[self._info.tags[0]]

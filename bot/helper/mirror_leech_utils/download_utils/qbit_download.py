@@ -43,6 +43,9 @@ def _get_hash_file(fpath):
 
 
 async def add_qb_torrent(listener, path, ratio, seed_time):
+    if TorrentManager.qbittorrent is None:
+        await listener.on_download_error("qBittorrent is not running or not installed!")
+        return
     try:
         form = AddFormBuilder.with_client(TorrentManager.qbittorrent)
         if await aiopath.exists(listener.link):

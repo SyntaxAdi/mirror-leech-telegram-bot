@@ -217,10 +217,16 @@ def update_user_ldata(id_, key, value):
 
 
 async def cmd_exec(cmd, shell=False):
-    if shell:
-        proc = await create_subprocess_shell(cmd, stdout=PIPE, stderr=PIPE)
-    else:
-        proc = await create_subprocess_exec(*cmd, stdout=PIPE, stderr=PIPE)
+    try:
+        if shell:
+            proc = await create_subprocess_shell(cmd, stdout=PIPE, stderr=PIPE)
+        else:
+            proc = await create_subprocess_exec(*cmd, stdout=PIPE, stderr=PIPE)
+    except FileNotFoundError as e:
+        return "", f"Executable not found: {e}", 1
+    except Exception as e:
+        return "", str(e), 1
+
     stdout, stderr = await proc.communicate()
     try:
         stdout = stdout.decode().strip()

@@ -23,11 +23,19 @@ from ..telegram_helper.message_utils import update_status_message
 
 
 async def _remove_torrent(hash_, tag):
-    await TorrentManager.qbittorrent.torrents.delete([hash_], True)
+    if TorrentManager.qbittorrent is not None:
+        try:
+            await TorrentManager.qbittorrent.torrents.delete([hash_], True)
+        except Exception as e:
+            LOGGER.error(e)
     async with qb_listener_lock:
         if tag in qb_torrents:
             del qb_torrents[tag]
-    await TorrentManager.qbittorrent.torrents.delete_tags([tag])
+    if TorrentManager.qbittorrent is not None:
+        try:
+            await TorrentManager.qbittorrent.torrents.delete_tags([tag])
+        except Exception as e:
+            LOGGER.error(e)
 
 
 @new_task
@@ -110,6 +118,9 @@ async def _on_download_complete(tor):
 
 @new_task
 async def _qb_listener():
+    if TorrentManager.qbittorrent is None:
+        intervals["qb"] = ""
+        return
     while True:
         async with qb_listener_lock:
             try:

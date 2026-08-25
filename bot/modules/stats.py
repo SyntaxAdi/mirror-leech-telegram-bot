@@ -79,7 +79,7 @@ async def get_version_async(command, regex):
     try:
         out, err, code = await cmd_exec(command)
         if code != 0:
-            return f"Error: {err}"
+            return "Not Installed"
         match = research(regex, out)
         return match.group(1) if match else "Version not found"
     except Exception as e:

@@ -27,29 +27,41 @@ from .torrent_manager import TorrentManager
 
 
 async def update_qb_options():
+    if TorrentManager.qbittorrent is None:
+        LOGGER.warning("qBittorrent client not initialized, skipping update_qb_options")
+        return
     LOGGER.info("Get qBittorrent options from server")
-    if not qbit_options:
-        opt = await TorrentManager.qbittorrent.app.preferences()
-        qbit_options.update(opt)
-        del qbit_options["listen_port"]
-        for k in list(qbit_options.keys()):
-            if k.startswith("rss"):
-                del qbit_options[k]
-        qbit_options["web_ui_password"] = "mltbmltb"
-        await TorrentManager.qbittorrent.app.set_preferences(
-            {"web_ui_password": "mltbmltb"}
-        )
-    else:
-        await TorrentManager.qbittorrent.app.set_preferences(qbit_options)
+    try:
+        if not qbit_options:
+            opt = await TorrentManager.qbittorrent.app.preferences()
+            qbit_options.update(opt)
+            del qbit_options["listen_port"]
+            for k in list(qbit_options.keys()):
+                if k.startswith("rss"):
+                    del qbit_options[k]
+            qbit_options["web_ui_password"] = "mltbmltb"
+            await TorrentManager.qbittorrent.app.set_preferences(
+                {"web_ui_password": "mltbmltb"}
+            )
+        else:
+            await TorrentManager.qbittorrent.app.set_preferences(qbit_options)
+    except Exception as e:
+        LOGGER.error(f"Failed to update qBittorrent options: {e}")
 
 
 async def update_aria2_options():
+    if TorrentManager.aria2 is None:
+        LOGGER.warning("Aria2 client not initialized, skipping update_aria2_options")
+        return
     LOGGER.info("Get aria2 options from server")
-    if not aria2_options:
-        op = await TorrentManager.aria2.getGlobalOption()
-        aria2_options.update(op)
-    else:
-        await TorrentManager.aria2.changeGlobalOption(aria2_options)
+    try:
+        if not aria2_options:
+            op = await TorrentManager.aria2.getGlobalOption()
+            aria2_options.update(op)
+        else:
+            await TorrentManager.aria2.changeGlobalOption(aria2_options)
+    except Exception as e:
+        LOGGER.error(f"Failed to update aria2 options: {e}")
 
 
 async def update_nzb_options():
@@ -176,18 +188,25 @@ async def save_settings():
     await database.db.settings.config.replace_one(
         {"_id": TgClient.ID}, config_dict, upsert=True
     )
-    if await database.db.settings.aria2c.find_one({"_id": TgClient.ID}) is None:
+    if (
+        aria2_options
+        and await database.db.settings.aria2c.find_one({"_id": TgClient.ID}) is None
+    ):
         await database.db.settings.aria2c.update_one(
             {"_id": TgClient.ID}, {"$set": aria2_options}, upsert=True
         )
-    if await database.db.settings.qbittorrent.find_one({"_id": TgClient.ID}) is None:
+    if (
+        qbit_options
+        and await database.db.settings.qbittorrent.find_one({"_id": TgClient.ID}) is None
+    ):
         await database.save_qbit_settings()
     if await database.db.settings.nzb.find_one({"_id": TgClient.ID}) is None:
-        async with aiopen("sabnzbd/SABnzbd.ini", "rb+") as pf:
-            nzb_conf = await pf.read()
-        await database.db.settings.nzb.update_one(
-            {"_id": TgClient.ID}, {"$set": {"SABnzbd__ini": nzb_conf}}, upsert=True
-        )
+        if await aiopath.exists("sabnzbd/SABnzbd.ini"):
+            async with aiopen("sabnzbd/SABnzbd.ini", "rb+") as pf:
+                nzb_conf = await pf.read()
+            await database.db.settings.nzb.update_one(
+                {"_id": TgClient.ID}, {"$set": {"SABnzbd__ini": nzb_conf}}, upsert=True
+            )
 
 
 async def update_variables():

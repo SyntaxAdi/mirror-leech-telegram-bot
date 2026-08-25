@@ -188,6 +188,8 @@ async def _on_download_error(api, data):
 
 
 def add_aria2_callbacks():
+    if TorrentManager.aria2 is None:
+        return
     TorrentManager.aria2.onBtDownloadComplete(_on_bt_download_complete)
     TorrentManager.aria2.onDownloadComplete(_on_download_complete)
     TorrentManager.aria2.onDownloadError(_on_download_error)

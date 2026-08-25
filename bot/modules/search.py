@@ -17,13 +17,17 @@ TELEGRAPH_LIMIT = 300
 
 
 async def initiate_search_tools():
-    qb_plugins = await TorrentManager.qbittorrent.search.plugins()
-    if qb_plugins:
-        names = [plugin.name for plugin in qb_plugins]
-        await TorrentManager.qbittorrent.search.uninstall_plugin(names)
-        PLUGINS.clear()
-    if Config.SEARCH_PLUGINS:
-        await TorrentManager.qbittorrent.search.install_plugin(Config.SEARCH_PLUGINS)
+    if TorrentManager.qbittorrent is not None:
+        try:
+            qb_plugins = await TorrentManager.qbittorrent.search.plugins()
+            if qb_plugins:
+                names = [plugin.name for plugin in qb_plugins]
+                await TorrentManager.qbittorrent.search.uninstall_plugin(names)
+                PLUGINS.clear()
+            if Config.SEARCH_PLUGINS:
+                await TorrentManager.qbittorrent.search.install_plugin(Config.SEARCH_PLUGINS)
+        except Exception as e:
+            LOGGER.error(f"Error initiating qBittorrent search plugins: {e}")
 
     if Config.SEARCH_API_LINK:
         global SITES
@@ -86,6 +90,9 @@ async def search(key, site, message, method):
             await edit_message(message, str(e))
             return
     else:
+        if TorrentManager.qbittorrent is None:
+            await edit_message(message, "qBittorrent is not running or not installed!")
+            return
         LOGGER.info(f"PLUGINS Searching: {key} from {site}")
         search = await TorrentManager.qbittorrent.search.start(
             pattern=key, plugins=[site], category="all"
@@ -206,10 +213,16 @@ def api_buttons(user_id, method):
 
 async def plugin_buttons(user_id):
     buttons = ButtonMaker()
+    if TorrentManager.qbittorrent is None:
+        buttons.data_button("Cancel", f"torser {user_id} cancel")
+        return buttons.build_menu(1)
     if not PLUGINS:
-        pl = await TorrentManager.qbittorrent.search.plugins()
-        for i in pl:
-            PLUGINS.append(i.name)
+        try:
+            pl = await TorrentManager.qbittorrent.search.plugins()
+            for i in pl:
+                PLUGINS.append(i.name)
+        except Exception as e:
+            LOGGER.error(f"Error fetching plugins: {e}")
     for siteName in PLUGINS:
         buttons.data_button(
             siteName.capitalize(), f"torser {user_id} {siteName} plugin"

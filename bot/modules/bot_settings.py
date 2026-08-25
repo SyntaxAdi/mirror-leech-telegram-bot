@@ -356,6 +356,10 @@ async def edit_aria(_, message, pre_message, key):
 @new_task
 async def edit_qbit(_, message, pre_message, key):
     handler_dict[message.chat.id] = False
+    if TorrentManager.qbittorrent is None:
+        await send_message(message, "qBittorrent is not running or not installed!")
+        await delete_message(message)
+        return
     value = str(message.text)
     if value.lower() == "true":
         value = True
@@ -365,7 +369,10 @@ async def edit_qbit(_, message, pre_message, key):
         value = float(value)
     elif value.isdigit():
         value = int(value)
-    await TorrentManager.qbittorrent.app.set_preferences({key: value})
+    try:
+        await TorrentManager.qbittorrent.app.set_preferences({key: value})
+    except Exception as e:
+        LOGGER.error(f"Failed to set qBittorrent preference: {e}")
     qbit_options[key] = value
     await update_buttons(pre_message, "qbit")
     await delete_message(message)
@@ -669,6 +676,9 @@ async def edit_bot_settings(client, query):
         await update_nzb_options()
         await database.update_nzb_config()
     elif data[1] == "syncqbit":
+        if TorrentManager.qbittorrent is None:
+            await query.answer("qBittorrent is not running or not installed!", show_alert=True)
+            return
         await query.answer(
             "Synchronization Started. It takes up to 2 sec!", show_alert=True
         )
@@ -683,7 +693,11 @@ async def edit_bot_settings(client, query):
         await database.update_aria2(data[2], "")
     elif data[1] == "emptyqbit":
         await query.answer()
-        await TorrentManager.qbittorrent.app.set_preferences({data[2]: ""})
+        if TorrentManager.qbittorrent is not None:
+            try:
+                await TorrentManager.qbittorrent.app.set_preferences({data[2]: ""})
+            except Exception as e:
+                LOGGER.error(f"Failed to clear qBittorrent preference: {e}")
         qbit_options[data[2]] = ""
         await update_buttons(message, "qbit")
         await database.update_qbittorrent(data[2], "")

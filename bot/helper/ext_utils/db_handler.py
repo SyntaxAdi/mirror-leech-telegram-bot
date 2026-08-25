@@ -78,7 +78,7 @@ class DbManager:
         )
 
     async def save_qbit_settings(self):
-        if self._return:
+        if self._return or not qbit_options:
             return
         await self.db.settings.qbittorrent.update_one(
             {"_id": TgClient.ID}, {"$set": qbit_options}, upsert=True

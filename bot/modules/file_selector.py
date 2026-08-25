@@ -81,10 +81,12 @@ async def select(_, message):
                 await sabnzbd_client.pause_job(id_)
             elif task.listener.is_qbit:
                 id_ = task.hash()
-                await TorrentManager.qbittorrent.torrents.stop([id_])
+                if TorrentManager.qbittorrent is not None:
+                    await TorrentManager.qbittorrent.torrents.stop([id_])
             else:
                 try:
-                    await TorrentManager.aria2.forcePause(id_)
+                    if TorrentManager.aria2 is not None:
+                        await TorrentManager.aria2.forcePause(id_)
                 except Exception as e:
                     LOGGER.error(
                         f"{e} Error in pause, this mostly happens after abuse aria2"
@@ -118,6 +120,8 @@ async def confirm_selection(_, query):
         id_ = data[3]
         if hasattr(task, "seeding"):
             if task.listener.is_qbit:
+                if TorrentManager.qbittorrent is None:
+                    return
                 tor_info = (
                     await TorrentManager.qbittorrent.torrents.info(hashes=[id_])
                 )[0]
@@ -135,6 +139,8 @@ async def confirm_selection(_, query):
                 if not task.queued:
                     await TorrentManager.qbittorrent.torrents.start([id_])
             else:
+                if TorrentManager.aria2 is None:
+                    return
                 res = await TorrentManager.aria2.getFiles(id_)
                 for f in res:
                     if f["selected"] == "false" and await aiopath.exists(f["path"]):
